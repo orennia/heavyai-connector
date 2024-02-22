@@ -395,6 +395,8 @@ var DbCon = /*#__PURE__*/function () {
 
     _defineProperty(this, "connect", this.callbackify("connectAsync", 0));
 
+    _defineProperty(this, "connectHA", this.callbackify("connectHAAsync", 0));
+
     _defineProperty(this, "disconnectAsync", this.handleErrors(function () {
       return Promise.all(_this2._client.map(function (client, c) {
         return client.disconnect(_this2._sessionId[c])["catch"](function (error) {
@@ -1120,6 +1122,53 @@ var DbCon = /*#__PURE__*/function () {
         return _this3;
       });
     }
+  }, {
+    key: "connectHAAsync",
+    value: function connectHAAsync() {
+      var _this4 = this;
+
+      console.log("Using connection HA ASYNC");
+
+      if (!Array.isArray(this._user) || !Array.isArray(this._password)) {
+        return Promise.reject("Username and password must be arrays.");
+      }
+
+      if (!this._dbName[0]) {
+        return Promise.reject("Please enter a database.");
+      } else if (!this._user[0]) {
+        return Promise.reject("Please enter a username.");
+      } else if (!this._password[0]) {
+        return Promise.reject("Please enter a password.");
+      } // now check to see if length of all arrays are the same and > 0
+
+
+      var hostLength = this._host.length;
+
+      if (hostLength < 1) {
+        return Promise.reject("Must have at least one server to connect to.");
+      }
+
+      if (hostLength !== this._port.length || hostLength !== this._user.length || hostLength !== this._password.length || hostLength !== this._dbName.length) {
+        return Promise.reject("Array connection parameters must be of equal length.");
+      }
+
+      var clients = [];
+      this.initClients();
+      clients = this._client; // Reset the client property, so we can add only the ones that we can connect to below
+
+      this._client = [];
+      return Promise.all(clients.map(function (client, h) {
+        return client.connect(_this4._user[h], _this4._password[h], _this4._dbName[h]).then(function (sessionId) {
+          _this4._client.push(client);
+
+          _this4._sessionId.push(sessionId);
+
+          return null;
+        });
+      })).then(function () {
+        return _this4;
+      });
+    }
     /**
      * Create a connection to the MapD server, generating a client and session ID.
      * @param {Function} callback An optional callback that takes `(err, success)` as its signature.  Returns con singleton if successful.
@@ -1503,10 +1552,10 @@ var DbCon = /*#__PURE__*/function () {
   }, {
     key: "getEndpoints",
     value: function getEndpoints() {
-      var _this4 = this;
+      var _this5 = this;
 
       return this._host.map(function (host, i) {
-        return "".concat(_this4._protocol[i], "://").concat(host, ":").concat(_this4._port[i]);
+        return "".concat(_this5._protocol[i], "://").concat(host, ":").concat(_this5._port[i]);
       });
     }
     /**

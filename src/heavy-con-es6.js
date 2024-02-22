@@ -456,6 +456,54 @@ export class DbCon {
       )
     ).then(() => this)
   }
+  connectHAAsync() {
+    console.log("Using connection HA ASYNC")
+    if (!Array.isArray(this._user) || !Array.isArray(this._password)) {
+      return Promise.reject("Username and password must be arrays.")
+    }
+
+    if (!this._dbName[0]) {
+      return Promise.reject("Please enter a database.")
+    } else if (!this._user[0]) {
+      return Promise.reject("Please enter a username.")
+    } else if (!this._password[0]) {
+      return Promise.reject("Please enter a password.")
+    }
+
+    // now check to see if length of all arrays are the same and > 0
+    const hostLength = this._host.length
+    if (hostLength < 1) {
+      return Promise.reject("Must have at least one server to connect to.")
+    }
+    if (
+      hostLength !== this._port.length ||
+      hostLength !== this._user.length ||
+      hostLength !== this._password.length ||
+      hostLength !== this._dbName.length
+    ) {
+      return Promise.reject(
+        "Array connection parameters must be of equal length."
+      )
+    }
+
+    let clients = []
+    this.initClients()
+    clients = this._client
+
+    // Reset the client property, so we can add only the ones that we can connect to below
+    this._client = []
+    return Promise.all(
+      clients.map((client, h) =>
+        client
+          .connect(this._user[h], this._password[h], this._dbName[h])
+          .then((sessionId) => {
+            this._client.push(client)
+            this._sessionId.push(sessionId)
+            return null
+          })
+      )
+    ).then(() => this)
+  }
 
   /**
    * Create a connection to the MapD server, generating a client and session ID.
@@ -474,6 +522,8 @@ export class DbCon {
    *   // ["om9E9Ujgbhl6wIzWgLENncjWsaXRDYLy"]
    */
   connect = this.callbackify("connectAsync", 0)
+
+  connectHA = this.callbackify("connectHAAsync", 0)
 
   convertFromThriftTypes(fields) {
     const fieldsArray = []
